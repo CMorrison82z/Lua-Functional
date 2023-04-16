@@ -18,6 +18,25 @@ Function.Memoize = function (f)
 	end
 end
 
+Function.MemoizeN = function(f, numParams)
+	local cache = {}
+  
+	return function(...)
+		local args = {...}
+		local cacheLevel = cache
+
+		for i = 1, numParams - 1 do
+			local arg = args[i]
+			cacheLevel[arg] = cacheLevel[arg] or {}
+			cacheLevel = cacheLevel[arg]
+		end
+		local lastArg = args[numParams]
+		cacheLevel[lastArg] = cacheLevel[lastArg] or f(...)
+		
+		return cacheLevel[lastArg]
+	end
+end  
+
 -- For a series of single argument && return functions.
 Function.Pipeline1 = function(...)
 	local pipeline = {...}
