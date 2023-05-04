@@ -7,3 +7,7 @@ Library of common higher order functions
 ## Functions
 
 ## Processes
+
+# TODO 
+
+- Iterator analogs (performance benefits when composing functions)
