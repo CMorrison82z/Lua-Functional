@@ -74,4 +74,49 @@ Function.BulkProcedure = function(f, argsList)
 	end
 end
 
+do
+	-- These functions are motivated by the idea that `function` are just maps. Their images are sets, and thus we can define intersections of functions (i.e. their images) etc.
+
+	-- TODO : Define for union / intersection return types (tuples, etc.)
+
+	local ImageOps = {}
+	m.ImageOps = ImageOps
+
+	do
+		local SingleOutput = {}
+		ImageOps.SingleOutput = SingleOutput
+		
+		function SingleOutput.Union(f, g)
+			return function (...)
+				return f(...) or g(...)
+			end
+		end
+
+		function SingleOutput.Intersection(f, g)
+			return function (...)
+				local i1, i2 = f(...), g(...)
+				
+				return i1 == i2 and i1
+			end
+		end
+
+		-- I_f - I_g
+		function SingleOutput.Complement(f, g)
+			return function (...)
+				local i1, i2 = f(...), g(...)
+			
+				return not i2 and i1
+			end
+		end
+
+		function SingleOutput.SymmetricCompliment(f, g)
+			return function (...)
+				local i1, i2 = f(...), g(...)
+
+				return not (i1 == i2 and i1) and (i1 or i2)
+			end
+		end
+	end
+end
+
 return Function
