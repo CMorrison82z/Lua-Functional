@@ -42,24 +42,34 @@ local function cycle(iterator, obj_0, state_0)
     end, obj_0, state_0
 end
 
-local function agnostic_mapper(predicate)
+local function map(predicate)
     return function(iter, obj_0, state_0)
         if type(iter) == "table" then
-            iter, obj_0, state_0 = (#iter > 0 and ipairs or pairs)(iter)
+            iter, obj_0, state_0 = ipairs(iter)
         end
 
         local v, r;
 
-        return function(obj, state)
-            repeat
-                state, v = iter(obj, state)
-                r = predicate(v)
-            until (state == nil) or (r ~= nil)
-
-            return state, r
+        return function(obj, ...)
+			return predicate(iter(obj, ...))
         end, obj_0, state_0
     end
 end
+
+-- maps values, ignoring the first value returned by an iterator (assumed to be the state)
+local function mapV(predicate)
+	return map(function(i, ...)
+		return i, predicate(...)
+	end)
+end
+
+-- local function mapNthArgs(predicate, n)
+-- 	return map(function(...)
+
+-- 		return i, predicate(...)
+-- 	end)
+-- end
+
 
 local function sort(predicate, iterator, obj_0, state_0)
     if type(iterator) == "table" then
@@ -96,18 +106,39 @@ local function unfold(gen, cond, seed)
     end, seed
 end
 
-local function filter(predicate)
-    return agnostic_mapper(function(v)
-        return predicate(v) and v or nil
-    end)
+local function filter(predicate, iterator, object_0, state_0)
+    if type(iterator) == "table" then
+        iterator, object_0, state_0 = ipairs(iterator)
+    end
+
+    local r;
+    
+    return function(o, ...)
+        repeat
+            r = table.pack(iterator(...))
+        until r[1] == nil or predicate(table.unpack(r))
+        return table.unpack(r)
+    end, object_0, state_0
 end
 
-local function partition(predicate)
-    return agnostic_mapper(function(v)
-        return predicate(v) and v or nil
-    end), agnostic_mapper(function(v)
-        return (not predicate(v)) and v or nil
-    end)
+local function partition(predicate, iterator, object_0, state_0)
+    if type(iterator) == "table" then
+        iterator, object_0, state_0 = ipairs(iterator)
+    end
+
+    local r;
+    
+    return function(o, ...)
+        repeat
+            r = table.pack(iterator(...))
+        until r[1] == nil or predicate(table.unpack(r))
+        return table.unpack(r)
+    end, object_0, state_0, function(o, ...)
+        repeat
+            r = table.pack(iterator(...))
+        until r[1] == nil or not predicate(table.unpack(r))
+        return table.unpack(r)
+    end, object_0, state_0
 end
 
 for value in unfold(function(x)
