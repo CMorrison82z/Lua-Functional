@@ -1,4 +1,27 @@
-local function bake(iterator, obj, state)
+
+
+-------------------
+
+--[[
+    -- todo : Try wrapping iterators in `{iter, source_0, state_0}` for better argument management
+]]
+
+export type Generator = {
+    Iterator : (t:table, state ...) -> any,
+    Object_0 : table,
+    State_0 : any
+}
+
+local function iter(t)
+    local generator : Generator = {}
+    generator.Iterator, generator.Object_0, generator.State_0 = (#t > 0 and ipairs or pairs)(t)
+
+    return generator
+end
+
+local function bake(Generator : Generator)
+    local iterator, obj, state = Generator.Iterator, Generator.Object_0, Generator.State_0
+    
     local t = {}
     
     local v; repeat

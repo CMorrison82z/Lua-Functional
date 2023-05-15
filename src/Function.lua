@@ -1,6 +1,6 @@
 local Function = {}
 
-Function.Curry = function(f, arg)
+Function.curry = function(f, arg)
 	return function(...)
 		return f(arg, ...)
 	end
@@ -8,7 +8,7 @@ end
 
 -- Lift == Curry(Image, predicate)
 
-Function.Memoize = function (f)
+Function.memoize = function (f)
 	local map = {}
 
 	return function(x)
@@ -18,7 +18,7 @@ Function.Memoize = function (f)
 	end
 end
 
-Function.MemoizeN = function(f, numParams)
+Function.memoize_N = function(f, numParams)
 	local cache = {}
   
 	return function(...)
@@ -38,7 +38,7 @@ Function.MemoizeN = function(f, numParams)
 end  
 
 -- For a series of single argument && return functions.
-Function.Pipeline1 = function(...)
+Function.pipeline_1 = function(...)
 	local pipeline = {...}
 	local numF = #pipeline
 
@@ -53,7 +53,7 @@ Function.Pipeline1 = function(...)
 	end
 end
 
-Function.Pipeline = function(...)
+Function.pipeline = function(...)
 	local pipeline = {...}
 	local numF = #pipeline
 
@@ -68,7 +68,7 @@ Function.Pipeline = function(...)
 	end
 end
 
-Function.BulkProcedure = function(f, argsList)
+Function.bulk_procedure = function(f, argsList)
 	for _, value in ipairs(argsList) do
 		f(table.unpack(value))
 	end
