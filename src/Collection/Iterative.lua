@@ -37,22 +37,6 @@ Iterative.iter = iter
 --     }
 -- end
 
-local function bake(Generator: Generator)
-    local iterator, obj, state = Generator.Iterator, Generator.Object_0, Generator.State_0
-    local t = {}
-
-    local v
-    repeat
-        state, v = iterator(obj, state)
-
-        t[state] = v
-    until (state == nil)
-
-    return t
-end
-
-Iterative.bake = bake
-
 function Iterative.enumerate(generator: Generator) : Generator
     if not isGenerator(generator) then
         generator = iter(generator)
@@ -168,26 +152,36 @@ end
 
 function Iterative.unfold(gen: (any) -> any, cond: (any) -> boolean, seed: any): Generator
     return {
-        Iterator = function(c)
-            return cond(c) and gen(c) or nil
+        Iterator = function(_, c)
+            if c then
+                c = gen(c)
+                return cond(c) and c or nil
+            else
+                return cond(seed) and seed
+            end
         end,
         Object_0 = seed,
         State_0 = nil
     }
 end
 
+
+
 local function filter(predicate: (...any) -> boolean, generator: Generator): Generator
     if not isGenerator(generator) then
         generator = iter(generator)
     end
 
-    local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0    
+    local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0
 
     return {
-        Iterator = function(...)
-            local r; repeat
-                r = table.pack(iterator(...))
-            until r[1] == nil or predicate(table.unpack(r))
+        Iterator = function(obj, ...)
+            local r = table.pack(iterator(obj, ...))
+            
+            while r[1] ~= nil and not predicate(table.unpack(r)) do
+                r = table.pack(iterator(obj, table.unpack(r)))
+            end
+            
             return table.unpack(r)
         end,
         Object_0 = obj_0,
@@ -202,13 +196,11 @@ function Iterative.partition(predicate: (...any) -> boolean, generator: Generato
         generator = iter(generator)
     end
 
-    local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0    
-
     local filterPredicate = function(...)
         return not predicate(...)
     end
 
-    return filter(predicate, iterator), filter(filterPredicate, iterator)
+    return filter(predicate, generator), filter(filterPredicate, generator)
 end
 
 function Iterative.zip(...: Generator)
@@ -223,12 +215,14 @@ function Iterative.zip(...: Generator)
     local _vs;
 
     return {
-        Iterator = function(_gens, i)
+        Iterator = function(_gens)
             _vs = {}
 
-            for _, _gener : Generator in _gens do
-                local _, v = _gener.Iterator(_gener.Object_0, i)
+            local v;
 
+            for _, _gener in ipairs(_gens) do
+                _gener._state, v = _gener.Iterator(_gener.Object_0, _gener._state or 0)
+                
                 if v == nil then
                     _vs = nil
                     break
@@ -237,11 +231,159 @@ function Iterative.zip(...: Generator)
                 end
             end
 
-            return _vs and table.unpack(_vs)
+            if _vs then
+                return table.unpack(_vs)
+            end
         end,
         Object_0 = _generators,
         State_0 = 0
     }
+end
+
+do
+    local _fold = {}
+    Iterative.Fold = _fold
+
+    function _fold.each(predicate, generator : Generator)
+        if not isGenerator(generator) then
+            generator = iter(generator)
+        end
+    
+        local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0
+    
+        local r repeat
+            r = r and table.pack(iterator(obj_0, table.unpack(r))) or table.pack(iterator(obj_0, state_0))
+
+            predicate(table.unpack(r))
+        until r[1] == nil
+    end
+
+    function _fold.bake(Generator: Generator)
+        local iterator, obj_0, state_0 = Generator.Iterator, Generator.Object_0, Generator.State_0
+        local t = {}
+    
+        local state, v = iterator(obj_0, state_0)
+        while state~= nil do
+            t[state] = v
+            state, v = iterator(obj_0, state)
+        end
+    
+        return t
+    end
+
+    -- todo : make it not suck
+    function _fold.bake_N(Generator: Generator)
+        local iterator, obj_0, state_0 = Generator.Iterator, Generator.Object_0, Generator.State_0
+        local t = {}
+    
+        local r = table.pack(iterator(obj_0, state_0))
+
+        local state = r[1]
+
+        while state~= nil do
+            t[state] = table.pack(select(2, table.unpack(r)))
+            r = table.pack(iterator(obj_0, state_0))
+
+            state = r[1]
+        end
+    
+        return t
+    end
+
+    function _fold.fold_l(predicate: (result : any, args...) -> any, idE, generator : Generator)
+        if not isGenerator(generator) then
+            generator = iter(generator)
+        end
+        
+        local result = idE
+
+        local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0
+    
+        local r repeat
+            r = r and table.pack(iterator(obj_0, table.unpack(r))) or table.pack(iterator(obj_0, state_0))
+
+            result = predicate(result, table.unpack(r))
+        until r[1] == nil
+    
+        return result
+    end
+    
+    -- * Note that predicate includes the state
+    -- ! Assumes that the 2nd value (usually the `value`) is the initial value of the `result`.
+    function _fold.reduce(predicate: (result : any, args...) -> any, generator : Generator)
+        if not isGenerator(generator) then
+            generator = iter(generator)
+        end
+        
+        local result;
+
+        local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0
+    
+        local r repeat
+            r = r and table.pack(iterator(obj_0, table.unpack(r))) or table.pack(iterator(obj_0, state_0))
+
+            result = result and predicate(result, table.unpack(r)) or r[2]
+        until r[1] == nil
+    
+        return result
+    end
+
+    function _fold.trans_fold_l(trans, predicate: (result : any, args...) -> any, idE, generator : Generator)
+        if not isGenerator(generator) then
+            generator = iter(generator)
+        end
+        
+        local result = idE
+
+        local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0
+    
+        local r repeat
+            r = r and table.pack(iterator(obj_0, table.unpack(r))) or table.pack(iterator(obj_0, state_0))
+
+            result = predicate(result, trans(table.unpack(r)))
+        until r[1] == nil
+    
+        return result
+    end
+
+    function _fold.transduce(trans, predicate: (result : any, args...) -> any, generator : Generator)
+        if not isGenerator(generator) then
+            generator = iter(generator)
+        end
+        
+        local result;
+
+        local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0
+    
+        local r repeat
+            r = r and table.pack(iterator(obj_0, table.unpack(r))) or table.pack(iterator(obj_0, state_0))
+
+            result = predicate(result, trans(table.unpack(r)))
+        until r[1] == nil
+    
+        return result
+    end
+
+    function _fold.scan(predicate: (result : any, args...) -> any, idE, generator : Generator)
+        if not isGenerator(generator) then
+            generator = iter(generator)
+        end
+        
+        local result = idE
+        local _scan = {result}
+
+        local iterator, obj_0, state_0 = generator.Iterator, generator.Object_0, generator.State_0
+    
+        local r repeat
+            r = r and table.pack(iterator(obj_0, table.unpack(r))) or table.pack(iterator(obj_0, state_0))
+
+            result = predicate(result, table.unpack(r))
+        until r[1] == nil
+    
+        return _scan
+    end
+
+    -- todo : write curried forms (ex. Trans_ducer (trans, predicate) -> f(generator) -> any)
 end
 
 return Iterative
